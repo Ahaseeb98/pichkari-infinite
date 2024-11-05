@@ -75,7 +75,7 @@ const groundLength = 1000; // Length to cover the entire road
 const groundGeometry = new THREE.PlaneGeometry(groundWidth, groundLength);
 const groundMaterial = new THREE.MeshBasicMaterial({
   color: 0xfad5a5,
-  depthBias: -0.0001,
+  // depthBias: -0.0001,
 }); // Add a tiny bias
 const ground = new THREE.Mesh(groundGeometry, groundMaterial);
 ground.rotation.x = -Math.PI / 2; // Lay it flat on the XZ plane
@@ -183,8 +183,8 @@ function addBuildings() {
 addBuildings();
 
 function createSun() {
-  const sunGeometry = new THREE.SphereGeometry(0.5, 32, 32); // Radius, width segments, height segments
-  const sunMaterial = new THREE.MeshBasicMaterial({ color: 0xffff00 }); // Yellow color for the sun
+  const sunGeometry = new THREE.SphereGeometry(2, 200, 200); // Radius, width segments, height segments
+  const sunMaterial = new THREE.MeshBasicMaterial({ color: 0xff7f50 }); // Yellow color for the sun
   const sun = new THREE.Mesh(sunGeometry, sunMaterial);
 
   sun.position.set(0, 5, -10); // Position the sun in the sky
@@ -308,10 +308,9 @@ function animate() {
 
       if (distance < 0.3) {
         // Collision detected
-        scene.remove(target);
-        targets.splice(j, 1);
-        scene.remove(paan);
-        spawns.splice(i, 1);
+        animateCollision(target); // Call the animation function
+        scene.remove(paan); // Remove the paan immediately
+        spawns.splice(i, 1); // Remove the paan from the array
 
         hits++;
         updateScoreboard();
@@ -364,7 +363,7 @@ function animate() {
     penaltyTarget.position.z += 0.35; // Ensure penalty targets move toward the bike
 
     // Check if penalty target has passed the bike without being hit
-    if (penaltyTarget.position.z >= bike.position.z) {
+    if (penaltyTarget.position.z >= bike?.position?.z) {
       scene.remove(penaltyTarget);
       penaltyTargets.splice(i, 1); // Remove from array
     }
@@ -374,7 +373,7 @@ function animate() {
       scene.remove(penaltyTarget);
       penaltyTargets.splice(i, 1); // Remove from array
     }
-    if (penaltyTarget.position.z >= bike.position.z) {
+    if (penaltyTarget.position.z >= bike?.position?.z) {
       const distance = penaltyTarget.position.distanceTo(bike.position);
       if (distance < 0.3) {
         // Collision detected with penalty target
@@ -398,3 +397,35 @@ camera.position.set(0, 1, 2.5);
 // Create targets at intervals
 setInterval(createTarget, 2000); // Create a normal target every 2 seconds
 setInterval(createPenaltyTarget, 4000); // Create a penalty target every 4 seconds
+
+function animateCollision(target) {
+  const originalScale = target.scale.clone(); // Store the original scale
+  const animationDuration = 200; // Duration of the animation in milliseconds
+  const scaleFactor = 1.5; // Scale factor during the hit animation
+
+  // Change color to red
+  target.material.color.set(0xff0000); // Change color to red
+
+  // Create an animation loop
+  const startTime = performance.now();
+  function animate() {
+    const elapsed = performance.now() - startTime;
+
+    // Calculate the scale based on the elapsed time
+    const t = Math.min(elapsed / animationDuration, 1); // Normalize to [0, 1]
+    const scale = originalScale
+      .clone()
+      .multiplyScalar(1 + (scaleFactor - 1) * t);
+    target.scale.set(scale.x, scale.y, scale.z); // Update target scale
+
+    if (t < 1) {
+      requestAnimationFrame(animate); // Continue the animation
+    } else {
+      // Remove the target after the animation completes
+      scene.remove(target);
+      targets.splice(targets.indexOf(target), 1); // Remove from targets array
+      target.scale.set(originalScale.x, originalScale.y, originalScale.z); // Reset scale
+    }
+  }
+  animate();
+}
