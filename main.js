@@ -234,7 +234,7 @@ function createTarget() {
   const target = new THREE.Mesh(targetGeometry, targetMaterial);
 
   // Set the target's position at a random x and a fixed negative z position
-  target.position.set((Math.random() - 0.5) * 5, 0.1, -30); // Start further back on the Z axis
+  target.position.set((Math.random() - 0.5) * 5, 0.2, -30); // Start further back on the Z axis
   targets.push(target); // Add to targets array
   scene.add(target);
 }
@@ -271,6 +271,27 @@ function createPenaltyTarget() {
 // Game loop
 function animate() {
   requestAnimationFrame(animate);
+
+  console.log(targets.length, "targets.length");
+  // Update regular targets
+  for (let i = targets.length - 1; i >= 0; i--) {
+    const target = targets[i];
+    target.position.z += 0.25; // Move targets toward the bike (positive Z direction)
+
+    // Check if target has passed the bike without being hit
+    if (target.position.z >= bike?.position?.z) {
+      scene.remove(target);
+      // targets.splice(i, 1); // Remove from array
+      losses++; // Increment losses only for regular targets
+      updateScoreboard(); // Update scoreboard
+    }
+
+    // Remove target if it moves off-screen
+    if (target.position.z > 100) {
+      scene.remove(target);
+      targets.splice(i, 1); // Remove from array
+    }
+  }
 
   // Move bike and spit objects
   if (bike) {
@@ -323,26 +344,6 @@ function animate() {
       spawns.splice(i, 1);
       misses++;
       updateScoreboard();
-    }
-  }
-
-  // Update regular targets
-  for (let i = targets.length - 1; i >= 0; i--) {
-    const target = targets[i];
-    target.position.z += 0.25; // Move targets toward the bike (positive Z direction)
-
-    // Check if target has passed the bike without being hit
-    if (target.position.z >= bike.position.z) {
-      scene.remove(target);
-      targets.splice(i, 1); // Remove from array
-      losses++; // Increment losses only for regular targets
-      updateScoreboard(); // Update scoreboard
-    }
-
-    // Remove target if it moves off-screen
-    if (target.position.z > 100) {
-      scene.remove(target);
-      targets.splice(i, 1); // Remove from array
     }
   }
 
