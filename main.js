@@ -1,5 +1,5 @@
-import * as THREE from 'three';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import * as THREE from "three";
+import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 
 let hits = 0;
 let misses = 0;
@@ -10,10 +10,14 @@ let penaltyTargetActive = false; // Flag to track if a penalty target is active
 const treeCount = 50; // Number of trees for smoother looping
 const treeSpacing = 5; // Distance to reset trees off-screen
 
+const buildingSpacing = 5; // Distance between each building on the z-axis
+const buildingCount = 30; // Number of buildings on each side of the road
 // Array to keep track of trees
 const trees = [];
+const buildings = [];
+
 function updateScoreboard() {
-  const scoreboard = document.getElementById('scoreboard');
+  const scoreboard = document.getElementById("scoreboard");
   scoreboard.innerHTML = `Hits: ${hits} | Misses: ${misses} | Losses: ${losses} | Penalties: ${penalties}`; // Update scoreboard display
 }
 
@@ -36,20 +40,26 @@ renderer.setClearColor(0xffe7be, 1); // Light blue color with full opacity
 // Create road
 
 const textureLoader = new THREE.TextureLoader();
-const roadTexture = textureLoader.load('path/to/road-texture.jpg'); // Use a high-quality road texture
+const roadTexture = textureLoader.load("assets/road.jpg"); // Use a high-quality road texture
+// Set texture repeat and wrap
 roadTexture.wrapS = THREE.RepeatWrapping;
 roadTexture.wrapT = THREE.RepeatWrapping;
-roadTexture.repeat.set(1, 10); // Adjust the repeat to control how often the texture repeats along the road
+roadTexture.repeat.set(1, 12);
 
-const roadGeometry = new THREE.PlaneGeometry(5, 1000);
+// Rotate the texture by 90 degrees
+roadTexture.rotation = Math.PI / 2; // Rotate 90 degrees
+roadTexture.center.set(0.5, 0.5); // Set the rotation center to the middle of the texture
+
 const roadMaterial = new THREE.MeshBasicMaterial({
-  color: 0x24496b,
+  map: roadTexture,
   side: THREE.DoubleSide,
 });
+const roadGeometry = new THREE.PlaneGeometry(5, 1000);
 const road = new THREE.Mesh(roadGeometry, roadMaterial);
+
+// Keep the road geometry rotation as it is
 road.rotation.x = -Math.PI / 2;
 scene.add(road);
-
 // Add lighting
 const ambientLight = new THREE.AmbientLight(0x404040); // soft white light
 scene.add(ambientLight);
@@ -58,12 +68,26 @@ const directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
 directionalLight.position.set(1, 1, 1).normalize();
 scene.add(directionalLight);
 
+// Ground (dirt) plane around the road
+const groundWidth = 50; // Width of the ground plane
+const groundLength = 1000; // Length to cover the entire road
+
+const groundGeometry = new THREE.PlaneGeometry(groundWidth, groundLength);
+const groundMaterial = new THREE.MeshBasicMaterial({
+  color: 0xfad5a5,
+  depthBias: -0.0001,
+}); // Add a tiny bias
+const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+ground.rotation.x = -Math.PI / 2; // Lay it flat on the XZ plane
+ground.position.y = -0.01; // Slightly below road to avoid z-fighting
+scene.add(ground);
+
 // Load bike model
 const loader = new GLTFLoader();
 let bike;
 
 loader.load(
-  'Motorcycle.glb',
+  "assets/Motorcycle.glb",
   (gltf) => {
     bike = gltf.scene;
     bike.scale.set(0.05, 0.05, 0.05);
@@ -74,7 +98,7 @@ loader.load(
   },
   undefined,
   function (error) {
-    console.error('An error occurred while loading the model:', error);
+    console.error("An error occurred while loading the model:", error);
   }
 );
 // Function to create trees at specific positions
@@ -103,25 +127,91 @@ for (let i = 0; i < treeCount; i++) {
   createTree(x, z);
 }
 
+function createBuilding(x, z, width, height, depth, color) {
+  const buildingGeometry = new THREE.BoxGeometry(width, height, depth);
+  const buildingMaterial = new THREE.MeshBasicMaterial({
+    color,
+    side: THREE.DoubleSide,
+    polygonOffset: true,
+    polygonOffsetFactor: 1, // Adjust as needed
+    polygonOffsetUnits: 1,
+  });
+  const building = new THREE.Mesh(buildingGeometry, buildingMaterial);
+
+  building.position.set(x, height / 2, z);
+  scene.add(building);
+
+  // Store the building and its z position for looping
+  buildings.push({ mesh: building, initialZ: z });
+}
+
+// Generate buildings along the road
+function addBuildings() {
+  const minDistance = 1; // Minimum distance between buildings
+
+  for (let i = 0; i < buildingCount; i++) {
+    const zPosition = -i * buildingSpacing + Math.random() * 2; // Small random offset
+    const width = Math.random() * 1.5 + 0.5;
+    const height = Math.random() * 0.5 + 5;
+    const depth = Math.random() * 1.5 + 0.5;
+    const colors = [0xcccccc, 0xa0a0a0, 0xb0b0b0, 0x999999];
+    const color = colors[Math.floor(Math.random() * colors.length)];
+    // Alternate sides of the road
+    // Alternate sides of the road
+    const leftZ = zPosition + Math.random() * minDistance;
+    const rightZ = zPosition - Math.random() * minDistance;
+
+    createBuilding(
+      -roadWidth - width / 2 - 0.5,
+      leftZ,
+      width,
+      height,
+      depth,
+      color
+    );
+    createBuilding(
+      roadWidth + width / 2 + 0.5,
+      rightZ,
+      width,
+      height,
+      depth,
+      color
+    );
+  }
+}
+
+addBuildings();
+
+function createSun() {
+  const sunGeometry = new THREE.SphereGeometry(0.5, 32, 32); // Radius, width segments, height segments
+  const sunMaterial = new THREE.MeshBasicMaterial({ color: 0xffff00 }); // Yellow color for the sun
+  const sun = new THREE.Mesh(sunGeometry, sunMaterial);
+
+  sun.position.set(0, 5, -10); // Position the sun in the sky
+  scene.add(sun);
+}
+
+createSun();
+
 let bikeSpeed = 0.1;
 let bikeDirection = 0; // To track left/right movement
 const spawns = []; // Array to keep track of spit objects
 const targets = []; // Array to keep track of normal targets
 const penaltyTargets = []; // Array to keep track of penalty targets
 
-document.addEventListener('keydown', (event) => {
-  if (event.key === 'ArrowLeft') {
+document.addEventListener("keydown", (event) => {
+  if (event.key === "ArrowLeft") {
     bikeDirection = -bikeSpeed; // Move left
-  } else if (event.key === 'ArrowRight') {
+  } else if (event.key === "ArrowRight") {
     bikeDirection = bikeSpeed; // Move right
-  } else if (event.key === ' ') {
+  } else if (event.key === " ") {
     spitPaan();
   }
 });
 
 // Stop bike movement when key is released
-document.addEventListener('keyup', (event) => {
-  if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+document.addEventListener("keyup", (event) => {
+  if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
     bikeDirection = 0; // Stop moving when key is released
   }
 });
@@ -254,6 +344,17 @@ function animate() {
     if (target.position.z > 100) {
       scene.remove(target);
       targets.splice(i, 1); // Remove from array
+    }
+  }
+
+  // Move buildings slowly toward the bike
+  for (const building of buildings) {
+    building.mesh.position.z += 0.1; // Move slower than trees for depth effect
+
+    // Reset building if it goes beyond a certain position
+    if (building.mesh.position.z > 10) {
+      building.mesh.position.z =
+        building.initialZ - buildingCount * buildingSpacing; // Ensure no overlap
     }
   }
 

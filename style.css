@@ -26,7 +26,7 @@ body {
 }
 
 #clouds {
-  padding: 100px 0;
+  /* padding: 100px 0; */
   background: #ffe7be;
 }
 
@@ -45,7 +45,7 @@ body {
 
 .cloud:before,
 .cloud:after {
-  content: '';
+  content: "";
   position: absolute;
   background: #fff;
   width: 100px;
