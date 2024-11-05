@@ -218,7 +218,7 @@ document.addEventListener("keyup", (event) => {
 
 // Spit paan
 function spitPaan() {
-  const paanGeometry = new THREE.SphereGeometry(0.05, 32, 32);
+  const paanGeometry = new THREE.SphereGeometry(0.1, 32, 32);
   const paanMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000 });
   const paan = new THREE.Mesh(paanGeometry, paanMaterial);
 
@@ -229,7 +229,7 @@ function spitPaan() {
 }
 
 function createTarget() {
-  const targetGeometry = new THREE.BoxGeometry(0.3, 0.3, 0.3);
+  const targetGeometry = new THREE.BoxGeometry(0.5, 0.8, 0.5);
   const targetMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff });
   const target = new THREE.Mesh(targetGeometry, targetMaterial);
 
@@ -242,7 +242,7 @@ function createTarget() {
 function createPenaltyTarget() {
   if (!penaltyTargetActive) {
     // Check if no active penalty target
-    const penaltyTargetGeometry = new THREE.BoxGeometry(0.3, 0.3, 0.3);
+    const penaltyTargetGeometry = new THREE.BoxGeometry(0.5, 0.8, 0.5);
     const penaltyTargetMaterial = new THREE.MeshBasicMaterial({
       color: 0xff0000,
     }); // Red color for penalty target
@@ -330,7 +330,7 @@ function animate() {
   // Update regular targets
   for (let i = targets.length - 1; i >= 0; i--) {
     const target = targets[i];
-    target.position.z += 0.35; // Move targets toward the bike (positive Z direction)
+    target.position.z += 0.25; // Move targets toward the bike (positive Z direction)
 
     // Check if target has passed the bike without being hit
     if (target.position.z >= bike.position.z) {
