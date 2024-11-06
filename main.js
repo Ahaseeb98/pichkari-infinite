@@ -272,16 +272,15 @@ function createPenaltyTarget() {
 function animate() {
   requestAnimationFrame(animate);
 
-  console.log(targets.length, "targets.length");
   // Update regular targets
   for (let i = targets.length - 1; i >= 0; i--) {
     const target = targets[i];
     target.position.z += 0.25; // Move targets toward the bike (positive Z direction)
 
     // Check if target has passed the bike without being hit
-    if (target.position.z >= bike?.position?.z) {
+    if (target.position.z >= bike?.position?.z + 10) {
       scene.remove(target);
-      // targets.splice(i, 1); // Remove from array
+      targets.splice(i, 1); // Remove from array
       losses++; // Increment losses only for regular targets
       updateScoreboard(); // Update scoreboard
     }
@@ -400,32 +399,28 @@ setInterval(createTarget, 2000); // Create a normal target every 2 seconds
 setInterval(createPenaltyTarget, 4000); // Create a penalty target every 4 seconds
 
 function animateCollision(target) {
-  const originalScale = target.scale.clone(); // Store the original scale
-  const animationDuration = 200; // Duration of the animation in milliseconds
-  const scaleFactor = 1.5; // Scale factor during the hit animation
+  const originalScale = target.scale.clone();
+  const animationDuration = 200;
+  const scaleFactor = 1.5;
+  target.material.color.set(0xff0000);
 
-  // Change color to red
-  target.material.color.set(0xff0000); // Change color to red
-
-  // Create an animation loop
   const startTime = performance.now();
   function animate() {
     const elapsed = performance.now() - startTime;
-
-    // Calculate the scale based on the elapsed time
-    const t = Math.min(elapsed / animationDuration, 1); // Normalize to [0, 1]
+    const t = Math.min(elapsed / animationDuration, 1);
     const scale = originalScale
       .clone()
       .multiplyScalar(1 + (scaleFactor - 1) * t);
-    target.scale.set(scale.x, scale.y, scale.z); // Update target scale
+    target.scale.set(scale.x, scale.y, scale.z);
 
     if (t < 1) {
-      requestAnimationFrame(animate); // Continue the animation
+      requestAnimationFrame(animate);
     } else {
-      // Remove the target after the animation completes
-      scene.remove(target);
-      targets.splice(targets.indexOf(target), 1); // Remove from targets array
-      target.scale.set(originalScale.x, originalScale.y, originalScale.z); // Reset scale
+      if (targets.includes(target)) {
+        scene.remove(target); // Remove from the scene
+        targets.splice(targets.indexOf(target), 1); // Ensure it's removed from array
+      }
+      target.scale.set(originalScale.x, originalScale.y, originalScale.z);
     }
   }
   animate();
