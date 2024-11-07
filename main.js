@@ -229,7 +229,7 @@ function spitPaan() {
 }
 
 function createTarget() {
-  const targetGeometry = new THREE.BoxGeometry(0.5, 0.8, 0.5);
+  const targetGeometry = new THREE.BoxGeometry(0.5, 0.5, 0.5);
   const targetMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff });
   const target = new THREE.Mesh(targetGeometry, targetMaterial);
 
@@ -242,7 +242,7 @@ function createTarget() {
 function createPenaltyTarget() {
   if (!penaltyTargetActive) {
     // Check if no active penalty target
-    const penaltyTargetGeometry = new THREE.BoxGeometry(0.5, 0.8, 0.5);
+    const penaltyTargetGeometry = new THREE.BoxGeometry(0.5, 0.5, 0.5);
     const penaltyTargetMaterial = new THREE.MeshBasicMaterial({
       color: 0xff0000,
     }); // Red color for penalty target
@@ -401,7 +401,7 @@ setInterval(createPenaltyTarget, 4000); // Create a penalty target every 4 secon
 function animateCollision(target) {
   const originalScale = target.scale.clone();
   const animationDuration = 200;
-  const scaleFactor = 1.5;
+  const scaleFactor = 0.3;
   target.material.color.set(0xff0000);
 
   const startTime = performance.now();
