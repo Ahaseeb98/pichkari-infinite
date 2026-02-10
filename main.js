@@ -1,28 +1,68 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 
-let hits = 0;
-let misses = 0;
-let losses = 0;
-let penalties = 0; // New penalties variable
-let penaltyTargetActive = false; // Flag to track if a penalty target is active
-// Constants
-const treeCount = 50; // Number of trees for smoother looping
-const treeSpacing = 5; // Distance to reset trees off-screen
+// Game State
+const gameState = {
+  hits: 0,
+  misses: 0,
+  losses: 0,
+  penalties: 0,
+  isPlaying: true,
+  speed: 0.1, // Base speed for world movement
+  lastTargetSpawn: 0,
+  lastPenaltySpawn: 0,
+};
 
-const buildingSpacing = 5; // Distance between each building on the z-axis
-const buildingCount = 30; // Number of buildings on each side of the road
-// Array to keep track of trees
+// Configuration
+const CONFIG = {
+  treeCount: 50,
+  treeSpacing: 5,
+  buildingSpacing: 5,
+  buildingCount: 30,
+  roadWidth: 2.5,
+  roadTreeWidth: 2.6,
+  maxPenalties: 5,
+  maxLosses: 10,
+  spawnIntervalTarget: 2000,
+  spawnIntervalPenalty: 4000,
+  speedIncrement: 0.005, // Speed increase per hit
+};
+
+// Array to keep track of objects
 const trees = [];
 const buildings = [];
 
 function updateScoreboard() {
   const scoreboard = document.getElementById("scoreboard");
-  scoreboard.innerHTML = `Hits: ${hits} | Misses: ${misses} | Losses: ${losses} | Penalties: ${penalties}`; // Update scoreboard display
+  if (!gameState.isPlaying) {
+    scoreboard.innerHTML = `GAME OVER | Hits: ${gameState.hits} | Final Score: ${gameState.hits - gameState.penalties * 2} <br> Press R to Restart`;
+    scoreboard.style.color = "red";
+    scoreboard.style.fontSize = "30px";
+    scoreboard.style.textAlign = "center";
+    scoreboard.style.left = "50%";
+    scoreboard.style.transform = "translateX(-50%)";
+  } else {
+    scoreboard.innerHTML = `Hits: ${gameState.hits} | Misses: ${gameState.misses} | Losses: ${gameState.losses} | Penalties: ${gameState.penalties}`;
+    scoreboard.style.color = "navy";
+    scoreboard.style.fontSize = "20px";
+    scoreboard.style.left = "10px";
+    scoreboard.style.transform = "none";
+  }
 }
 
-const roadWidth = 2.5; // Half the width of the road (since the road goes from -2.5 to 2.5 on the X-axis)
-const roadTreeWidth = 2.6; // Half the width of the road (since the road goes from -2.5 to 2.5 on the X-axis)
+// Window Resize Handler
+window.addEventListener("resize", () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+// Restart Handler
+window.addEventListener("keydown", (e) => {
+  if (!gameState.isPlaying && e.key.toLowerCase() === "r") {
+    location.reload();
+  }
+});
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0xffe7be); // Light blue color
@@ -31,7 +71,7 @@ const camera = new THREE.PerspectiveCamera(
   75,
   window.innerWidth / window.innerHeight,
   0.08,
-  1000
+  1000,
 );
 const renderer = new THREE.WebGLRenderer({ alpha: true }); // Enable transparency if you want
 renderer.setSize(window.innerWidth, window.innerHeight);
@@ -99,7 +139,7 @@ loader.load(
   undefined,
   function (error) {
     console.error("An error occurred while loading the model:", error);
-  }
+  },
 );
 // Function to create trees at specific positions
 function createTree(x, z) {
@@ -121,9 +161,11 @@ function createTree(x, z) {
 }
 
 // Create initial trees
-for (let i = 0; i < treeCount; i++) {
-  const x = i % 2 === 0 ? -roadTreeWidth : roadTreeWidth;
-  const z = -Math.random() * treeSpacing * treeCount - Math.random() * 10; // Random initial z position
+// Create initial trees
+for (let i = 0; i < CONFIG.treeCount; i++) {
+  const x = i % 2 === 0 ? -CONFIG.roadTreeWidth : CONFIG.roadTreeWidth;
+  const z =
+    -Math.random() * CONFIG.treeSpacing * CONFIG.treeCount - Math.random() * 10; // Random initial z position
   createTree(x, z);
 }
 
@@ -149,33 +191,32 @@ function createBuilding(x, z, width, height, depth, color) {
 function addBuildings() {
   const minDistance = 1; // Minimum distance between buildings
 
-  for (let i = 0; i < buildingCount; i++) {
-    const zPosition = -i * buildingSpacing + Math.random() * 2; // Small random offset
+  for (let i = 0; i < CONFIG.buildingCount; i++) {
+    const zPosition = -i * CONFIG.buildingSpacing + Math.random() * 2; // Small random offset
     const width = Math.random() * 1.5 + 0.5;
     const height = Math.random() * 0.5 + 5;
     const depth = Math.random() * 1.5 + 0.5;
     const colors = [0xcccccc, 0xa0a0a0, 0xb0b0b0, 0x999999];
     const color = colors[Math.floor(Math.random() * colors.length)];
-    // Alternate sides of the road
-    // Alternate sides of the road
+
     const leftZ = zPosition + Math.random() * minDistance;
     const rightZ = zPosition - Math.random() * minDistance;
 
     createBuilding(
-      -roadWidth - width / 2 - 0.5,
+      -CONFIG.roadWidth - width / 2 - 0.5,
       leftZ,
       width,
       height,
       depth,
-      color
+      color,
     );
     createBuilding(
-      roadWidth + width / 2 + 0.5,
+      CONFIG.roadWidth + width / 2 + 0.5,
       rightZ,
       width,
       height,
       depth,
-      color
+      color,
     );
   }
 }
@@ -240,163 +281,170 @@ function createTarget() {
 }
 
 function createPenaltyTarget() {
-  if (!penaltyTargetActive) {
-    // Check if no active penalty target
-    const penaltyTargetGeometry = new THREE.BoxGeometry(0.5, 0.5, 0.5);
-    const penaltyTargetMaterial = new THREE.MeshBasicMaterial({
-      color: 0xff0000,
-    }); // Red color for penalty target
-    const penaltyTarget = new THREE.Mesh(
-      penaltyTargetGeometry,
-      penaltyTargetMaterial
-    );
+  const penaltyTargetGeometry = new THREE.BoxGeometry(0.5, 0.5, 0.5);
+  const penaltyTargetMaterial = new THREE.MeshBasicMaterial({
+    color: 0xff0000,
+  }); // Red color for penalty target
+  const penaltyTarget = new THREE.Mesh(
+    penaltyTargetGeometry,
+    penaltyTargetMaterial,
+  );
 
-    // Set the penalty target's position behind the bike
-    penaltyTarget.position.set((Math.random() - 0.5) * 5, 0.1, -30); // Random x, fixed z
+  // Set the penalty target's position behind the bike (actually deep in background)
+  penaltyTarget.position.set((Math.random() - 0.5) * 5, 0.2, -30);
 
-    penaltyTargets.push(penaltyTarget); // Add to penalty targets array
-    scene.add(penaltyTarget);
-    penaltyTargetActive = true; // Set the flag to indicate an active penalty target
-
-    // Set a timeout to remove the penalty target after a random time between 10 and 20 seconds
-    const penaltyDuration = Math.random() * 5000 + 5000; // Random time between 10 and 20 seconds
-    setTimeout(() => {
-      scene.remove(penaltyTarget);
-      penaltyTargets.splice(penaltyTargets.indexOf(penaltyTarget), 1); // Remove from array
-      penaltyTargetActive = false; // Reset flag to allow new penalty target creation
-    }, penaltyDuration);
-  }
+  penaltyTargets.push(penaltyTarget);
+  scene.add(penaltyTarget);
 }
 
 // Game loop
-function animate() {
+function animate(time) {
   requestAnimationFrame(animate);
+
+  if (!gameState.isPlaying) return;
+
+  // Spawning Logic
+  if (time - gameState.lastTargetSpawn > CONFIG.spawnIntervalTarget) {
+    createTarget();
+    gameState.lastTargetSpawn = time;
+  }
+
+  if (time - gameState.lastPenaltySpawn > CONFIG.spawnIntervalPenalty) {
+    createPenaltyTarget();
+    gameState.lastPenaltySpawn = time;
+  }
 
   // Update regular targets
   for (let i = targets.length - 1; i >= 0; i--) {
     const target = targets[i];
-    target.position.z += 0.25; // Move targets toward the bike (positive Z direction)
+    target.position.z += gameState.speed * 2.5; // Move proportional to game speed
 
     // Check if target has passed the bike without being hit
-    if (target.position.z >= bike?.position?.z + 10) {
+    if (!target.isHit && target.position.z >= bike?.position?.z + 2) {
       scene.remove(target);
-      targets.splice(i, 1); // Remove from array
-      losses++; // Increment losses only for regular targets
-      updateScoreboard(); // Update scoreboard
-    }
+      targets.splice(i, 1);
 
-    // Remove target if it moves off-screen
-    if (target.position.z > 100) {
-      scene.remove(target);
-      targets.splice(i, 1); // Remove from array
+      gameState.losses++;
+      updateScoreboard();
     }
   }
 
   // Move bike and spit objects
   if (bike) {
-    bike.position.z += -0.000001; // Move bike forward continuously
-    bike.position.x += bikeDirection; // Move bike left/right based on key press
+    // bike.position.z += -0.000001; // Removing this slight forward move to keep player stationary relative to world
+    bike.position.x += bikeDirection;
 
     // Boundary checks
-    if (bike.position.x < -roadWidth) {
-      bike.position.x = -roadWidth; // Prevent moving left off the road
-    } else if (bike.position.x > roadWidth) {
-      bike.position.x = roadWidth; // Prevent moving right off the road
+    if (bike.position.x < -CONFIG.roadWidth) {
+      bike.position.x = -CONFIG.roadWidth;
+    } else if (bike.position.x > CONFIG.roadWidth) {
+      bike.position.x = CONFIG.roadWidth;
     }
   }
 
-  // Move trees along with the bike and loop them
+  // Move trees
   for (const tree of trees) {
-    tree.z += 0.35; // Move trees toward the bike
+    tree.z += gameState.speed * 3.5; // Trees move faster
     tree.trunk.position.z = tree.z;
     tree.foliage.position.z = tree.z;
 
-    // Check if tree needs to loop back
-    if (tree.z > 100) {
-      tree.z = -30; // Research t the tree's position to create the loop effect
+    if (tree.z > 20) {
+      tree.z = -100; // Loop back further
     }
   }
 
   // Update spit positions
   for (let i = spawns.length - 1; i >= 0; i--) {
     const paan = spawns[i];
-    paan.position.z -= 0.2; // Update spit position
+    paan.position.z -= 0.5; // Spit moves fast forward
 
     for (let j = targets.length - 1; j >= 0; j--) {
       const target = targets[j];
       const distance = paan.position.distanceTo(target.position);
 
-      if (distance < 0.3) {
-        // Collision detected
-        animateCollision(target); // Call the animation function
-        scene.remove(paan); // Remove the paan immediately
-        spawns.splice(i, 1); // Remove the paan from the array
+      if (distance < 0.5 && !target.isHit) {
+        // Increased hit radius slightly
+        target.isHit = true;
+        animateCollision(target);
+        scene.remove(paan);
+        spawns.splice(i, 1);
 
-        hits++;
+        gameState.hits++;
+        gameState.speed += CONFIG.speedIncrement; // Increase speed
         updateScoreboard();
+
+        // Break to avoid double counting if multiple targets are close (though unlikely)
+        break;
       }
     }
 
     // Remove the spit if it moves too far
-    if (paan.position.z < -20) {
-      scene.remove(paan);
-      spawns.splice(i, 1);
-      misses++;
-      updateScoreboard();
+    if (paan.position.z < -50) {
+      if (spawns[i]) {
+        // Check if not already removed
+        scene.remove(paan);
+        spawns.splice(i, 1);
+        gameState.misses++;
+        updateScoreboard();
+      }
     }
   }
 
-  // Move buildings slowly toward the bike
+  // Move buildings
   for (const building of buildings) {
-    building.mesh.position.z += 0.1; // Move slower than trees for depth effect
+    building.mesh.position.z += gameState.speed;
 
-    // Reset building if it goes beyond a certain position
-    if (building.mesh.position.z > 10) {
+    if (building.mesh.position.z > 20) {
       building.mesh.position.z =
-        building.initialZ - buildingCount * buildingSpacing; // Ensure no overlap
+        building.initialZ - CONFIG.buildingCount * CONFIG.buildingSpacing;
     }
   }
 
   // Update penalty targets
   for (let i = penaltyTargets.length - 1; i >= 0; i--) {
     const penaltyTarget = penaltyTargets[i];
-    penaltyTarget.position.z += 0.35; // Ensure penalty targets move toward the bike
+    penaltyTarget.position.z += gameState.speed * 3.5;
 
-    // Check if penalty target has passed the bike without being hit
-    if (penaltyTarget.position.z >= bike?.position?.z) {
+    // Remove if passed
+    if (penaltyTarget.position.z >= bike?.position?.z + 2) {
       scene.remove(penaltyTarget);
-      penaltyTargets.splice(i, 1); // Remove from array
+      penaltyTargets.splice(i, 1);
     }
 
-    // Remove penalty target if it moves off-screen
-    if (penaltyTarget.position.z > 100) {
-      scene.remove(penaltyTarget);
-      penaltyTargets.splice(i, 1); // Remove from array
-    }
-    if (penaltyTarget.position.z >= bike?.position?.z) {
-      const distance = penaltyTarget.position.distanceTo(bike.position);
-      if (distance < 0.3) {
-        // Collision detected with penalty target
+    // Check collision with bike
+    if (
+      penaltyTarget.position.z >= bike?.position?.z - 0.5 &&
+      penaltyTarget.position.z <= bike?.position?.z + 0.5
+    ) {
+      // Simple box collision approximation
+      if (Math.abs(penaltyTarget.position.x - bike.position.x) < 0.5) {
         scene.remove(penaltyTarget);
-        penaltyTargets.splice(i, 1); // Remove from array
-        penalties++; // Increment penalties
-        updateScoreboard(); // Update scoreboard
+        penaltyTargets.splice(i, 1);
+        gameState.penalties++;
+        updateScoreboard();
       }
     }
+  }
+
+  // Game Over Check
+  if (
+    gameState.penalties >= CONFIG.maxPenalties ||
+    gameState.losses >= CONFIG.maxLosses
+  ) {
+    gameState.isPlaying = false;
+    updateScoreboard();
   }
 
   renderer.render(scene, camera);
 }
 
-animate();
-createPenaltyTarget(); // Call this in the animate loop to continually check for new penalty targets
+animate(0);
+// createPenaltyTarget(); // Handled in loop now
 
 // Initial camera position
 camera.position.set(0, 1, 2.5);
 
-// Create targets at intervals
-setInterval(createTarget, 2000); // Create a normal target every 2 seconds
-setInterval(createPenaltyTarget, 4000); // Create a penalty target every 4 seconds
+// Create targets at intervals - Removed setIntervals in favor of game loop
 
 function animateCollision(target) {
   const originalScale = target.scale.clone();
@@ -416,9 +464,10 @@ function animateCollision(target) {
     if (t < 1) {
       requestAnimationFrame(animate);
     } else {
-      if (targets.includes(target)) {
-        scene.remove(target); // Remove from the scene
-        targets.splice(targets.indexOf(target), 1); // Ensure it's removed from array
+      const index = targets.indexOf(target);
+      if (index > -1) {
+        scene.remove(target);
+        targets.splice(index, 1);
       }
       target.scale.set(originalScale.x, originalScale.y, originalScale.z);
     }
