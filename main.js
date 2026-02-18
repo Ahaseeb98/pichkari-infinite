@@ -142,22 +142,44 @@ loader.load(
   },
 );
 // Function to create trees at specific positions
+// Function to create trees at specific positions
 function createTree(x, z) {
-  const trunkGeometry = new THREE.CylinderGeometry(0.05, 0.1, 0.5, 8);
-  const trunkMaterial = new THREE.MeshBasicMaterial({ color: 0x8b4513 }); // Brown color for trunk
-  const trunk = new THREE.Mesh(trunkGeometry, trunkMaterial);
-  trunk.position.set(x, 0.25, z); // Lower height for trunk
+  const type = Math.random() > 0.5 ? "oak" : "pine";
 
-  const foliageGeometry = new THREE.SphereGeometry(0.2, 16, 16);
-  const foliageMaterial = new THREE.MeshBasicMaterial({ color: 0x228b22 }); // Green color for foliage
+  const trunkGeometry = new THREE.CylinderGeometry(0.05, 0.1, 0.5, 8);
+  const trunkMaterial = new THREE.MeshBasicMaterial({ color: 0x8b4513 });
+  const trunk = new THREE.Mesh(trunkGeometry, trunkMaterial);
+  trunk.position.set(x, 0.25, z);
+
+  let foliageGeometry;
+  // Random shade of green
+  const greenShades = [0x228b22, 0x006400, 0x32cd32, 0x6b8e23];
+  const color = greenShades[Math.floor(Math.random() * greenShades.length)];
+  const foliageMaterial = new THREE.MeshBasicMaterial({ color: color });
+
+  let foliageY = 0.75;
+
+  if (type === "oak") {
+    foliageGeometry = new THREE.SphereGeometry(
+      0.2 + Math.random() * 0.1,
+      16,
+      16,
+    );
+    foliageY = 0.75;
+  } else {
+    // pine
+    foliageGeometry = new THREE.ConeGeometry(0.25, 0.8, 16);
+    foliageY = 0.85;
+  }
+
   const foliage = new THREE.Mesh(foliageGeometry, foliageMaterial);
-  foliage.position.set(x, 0.75, z); // Foliage sits above the trunk
+  foliage.position.set(x, foliageY, z);
 
   scene.add(trunk);
   scene.add(foliage);
 
   // Store the tree and its z position for looping
-  trees.push({ trunk, foliage, z });
+  trees.push({ trunk, foliage, z, type });
 }
 
 // Create initial trees
@@ -270,13 +292,37 @@ function spitPaan() {
 }
 
 function createTarget() {
-  const targetGeometry = new THREE.BoxGeometry(0.5, 0.5, 0.5);
-  const targetMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff });
+  // Randomize Geometry
+  const types = ["box", "sphere", "diamond"];
+  const type = types[Math.floor(Math.random() * types.length)];
+
+  let targetGeometry;
+  if (type === "box") {
+    targetGeometry = new THREE.BoxGeometry(0.5, 0.5, 0.5);
+  } else if (type === "sphere") {
+    targetGeometry = new THREE.SphereGeometry(0.35, 16, 16);
+  } else {
+    // diamond/octahedron
+    targetGeometry = new THREE.OctahedronGeometry(0.35);
+  }
+
+  // Randomize Color (keep them bright)
+  const colors = [0xffffff, 0xffff00, 0x00ffff, 0xff00ff];
+  const color = colors[Math.floor(Math.random() * colors.length)];
+
+  const targetMaterial = new THREE.MeshBasicMaterial({ color: color });
   const target = new THREE.Mesh(targetGeometry, targetMaterial);
 
   // Set the target's position at a random x and a fixed negative z position
-  target.position.set((Math.random() - 0.5) * 5, 0.2, -30); // Start further back on the Z axis
-  targets.push(target); // Add to targets array
+  target.position.set((Math.random() - 0.5) * 5, 0.2, -30);
+  target.isHit = false; // Initialize hit flag
+
+  // Custom rotation for diamonds to look nicer
+  if (type === "diamond") {
+    target.rotation.y = Math.PI / 4;
+  }
+
+  targets.push(target);
   scene.add(target);
 }
 
